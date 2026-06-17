@@ -24,6 +24,17 @@
     <section id="message" class="status"></section>
     <section class="content">
       <div class="card">
+        <p class="eyebrow">Navigation pages</p>
+        <h3>Create side navigation pages</h3>
+        <p class="meta">Each page acts like a predefined search. A page named “Mussar” will show recordings whose title, speaker, album, genre, or description contains “Mussar”.</p>
+        <form id="pageForm" class="inline-form">
+          <label for="pageName">Page name</label>
+          <input id="pageName" name="pageName" type="text" placeholder="Mussar, Parsha, Daf Yomi...">
+          <button class="ghost manage-button" type="submit">Create page</button>
+        </form>
+      </div>
+      <div id="pageList" class="grid"></div>
+      <div class="card">
         <p class="eyebrow">Current recordings</p>
         <h3>Delete files</h3>
         <p class="meta">Deleting removes the audio file from the library folder.</p>

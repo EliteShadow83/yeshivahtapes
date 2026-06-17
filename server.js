@@ -7,6 +7,7 @@ const PORT = process.env.PORT || 3131;
 const RESCAN_INTERVAL_MS = 15 * 60 * 1000;
 const AUDIO_DIR = 'D:\\Yeshivahtapes';
 const PUBLIC_DIR = path.join(__dirname, 'public');
+const PAGES_FILE = path.join(__dirname, 'pages.json');
 const AUDIO_EXTENSIONS = new Set(['.mp3', '.m4a', '.aac', '.flac', '.wav', '.ogg', '.opus', '.wma']);
 const MIME_TYPES = { '.html':'text/html; charset=utf-8', '.css':'text/css; charset=utf-8', '.js':'text/javascript; charset=utf-8', '.json':'application/json; charset=utf-8', '.mp3':'audio/mpeg', '.m4a':'audio/mp4', '.aac':'audio/aac', '.flac':'audio/flac', '.wav':'audio/wav', '.ogg':'audio/ogg', '.opus':'audio/ogg', '.wma':'audio/x-ms-wma' };
 let libraryCache = [];
@@ -18,6 +19,24 @@ function durationLabel(seconds) { if (!seconds || Number.isNaN(seconds)) return 
 function json(res, status, data) { res.writeHead(status, { 'Content-Type': MIME_TYPES['.json'] }); res.end(JSON.stringify(data)); }
 function safeJoin(root, requestPath) { const filePath = path.resolve(root, requestPath); if (!filePath.startsWith(path.resolve(root))) return null; return filePath; }
 function cleanFileName(fileName) { return path.basename(fileName || '').replace(/[<>:"/\\|?*\u0000-\u001f]/g, '-'); }
+function cleanPageName(name) { return cleanText(name).replace(/[<>:"/\\|?*\u0000-\u001f]/g, '').slice(0, 80); }
+
+function readPages() {
+  if (!fs.existsSync(PAGES_FILE)) return [];
+  try {
+    const pages = JSON.parse(fs.readFileSync(PAGES_FILE, 'utf8'));
+    return Array.isArray(pages) ? pages.filter(Boolean).map(cleanPageName).filter(Boolean) : [];
+  } catch (error) {
+    console.warn(`Unable to read pages: ${error.message}`);
+    return [];
+  }
+}
+
+function writePages(pages) {
+  const uniquePages = [...new Set(pages.map(cleanPageName).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  fs.writeFileSync(PAGES_FILE, `${JSON.stringify(uniquePages, null, 2)}\n`);
+  return uniquePages;
+}
 
 function walkAudioFiles(dir) {
   if (!fs.existsSync(dir)) { fs.mkdirSync(dir, { recursive: true }); return []; }
@@ -255,14 +274,35 @@ function handleDelete(req, res, url) {
   return json(res, 200, { deleted: relPath });
 }
 
+async function handleCreatePage(req, res) {
+  let body = {};
+  try {
+    body = JSON.parse((await collectBody(req)).toString('utf8') || '{}');
+  } catch (error) {
+    return json(res, 400, { error: 'Invalid page data' });
+  }
+  const name = cleanPageName(body.name);
+  if (!name) return json(res, 400, { error: 'Page name is required' });
+  return json(res, 200, { pages: writePages([...readPages(), name]) });
+}
+
+function handleDeletePage(req, res, url) {
+  const name = cleanPageName(url.searchParams.get('name'));
+  if (!name) return json(res, 400, { error: 'Page name is required' });
+  return json(res, 200, { pages: writePages(readPages().filter((page) => page !== name)) });
+}
+
 scanLibrary();
 setInterval(scanLibrary, RESCAN_INTERVAL_MS);
 http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
-  if (url.pathname === '/api/library') return json(res, 200, { scanState, tracks: libraryCache, albums: groupedBy('album'), artists: groupedBy('artist') });
+  if (url.pathname === '/api/library') return json(res, 200, { scanState, tracks: libraryCache, albums: groupedBy('album'), artists: groupedBy('artist'), pages: readPages() });
   if (url.pathname.startsWith('/api/tracks/')) return json(res, 200, libraryCache.find((item) => item.id === decodeURIComponent(url.pathname.split('/').pop())) || { error: 'Track not found' });
   if (url.pathname === '/api/upload' && req.method === 'POST') return handleUpload(req, res);
   if (url.pathname === '/api/files' && req.method === 'DELETE') return handleDelete(req, res, url);
+  if (url.pathname === '/api/pages' && req.method === 'GET') return json(res, 200, { pages: readPages() });
+  if (url.pathname === '/api/pages' && req.method === 'POST') return handleCreatePage(req, res);
+  if (url.pathname === '/api/pages' && req.method === 'DELETE') return handleDeletePage(req, res, url);
   if (url.pathname.startsWith('/media/')) return serveMedia(req, res, url.pathname.slice('/media/'.length));
   const requestPath = url.pathname === '/' ? 'index.html' : url.pathname.slice(1);
   return serveFile(res, safeJoin(PUBLIC_DIR, requestPath) || path.join(PUBLIC_DIR, 'index.html'));

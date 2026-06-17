@@ -1,12 +1,19 @@
 const app = document.querySelector('#app');
 const statusEl = document.querySelector('#status');
 const search = document.querySelector('#search');
-let library = { tracks: [], albums: {}, artists: {}, scanState: {} };
+const sideNav = document.querySelector('#sideNav');
+let library = { tracks: [], albums: {}, artists: {}, pages: [], scanState: {} };
 let query = '';
 
 const esc = (value = '') => String(value).replace(/[&<>"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[char]));
 const routeParts = () => location.hash.replace(/^#\/?/, '').split('/').filter(Boolean);
-const filteredTracks = () => library.tracks.filter((track) => [track.title, track.artist, track.album, track.genre, track.description].join(' ').toLowerCase().includes(query));
+const trackMatches = (track, text) => [track.title, track.artist, track.album, track.genre, track.description].join(' ').toLowerCase().includes(text.toLowerCase());
+const filteredTracks = () => library.tracks.filter((track) => trackMatches(track, query));
+
+function renderNavigation() {
+  const customLinks = (library.pages || []).map((page) => `<a href="#/pages/${encodeURIComponent(page)}" data-route="pages">${esc(page)}</a>`).join('');
+  sideNav.innerHTML = `<a href="#/" data-route="home">Library</a><a href="#/albums" data-route="albums">Albums</a><a href="#/speakers" data-route="speakers">Speakers</a>${customLinks}`;
+}
 
 function setActive() {
   const root = routeParts()[0] || 'home';
@@ -57,12 +64,18 @@ function renderSpeaker(name) {
   app.innerHTML = `<p class="eyebrow">Speaker</p><h3>${esc(decoded)}</h3><br><div class="grid">${tracks.map(trackCard).join('')}</div>`;
 }
 
+function renderCustomPage(name) {
+  const decoded = decodeURIComponent(name || '');
+  const tracks = library.tracks.filter((track) => trackMatches(track, decoded));
+  app.innerHTML = `<p class="eyebrow">Custom page</p><h3>${esc(decoded)}</h3><p class="meta">Showing recordings that match "${esc(decoded)}".</p><br><div class="grid">${tracks.map(trackCard).join('')}</div>`;
+}
+
 function renderTrack(id) {
   const track = library.tracks.find((item) => item.id === id);
   if (!track) { app.innerHTML = '<div class="empty">Track not found.</div>'; return; }
   app.innerHTML = `<article class="track-page">
     <div class="card">
-      <p class="eyebrow">${esc(track.genre)}</p>
+      <p class="eyebrow">${esc(track.album)}</p>
       <h2>${esc(track.title)}</h2>
       <p class="meta">${esc(track.description)}</p>
       <div class="pills">
@@ -86,6 +99,7 @@ function render() {
   if (!root) return renderHome();
   if (root === 'albums' && value) return renderAlbum(value);
   if (root === 'speakers' && value) return renderSpeaker(value);
+  if (root === 'pages' && value) return renderCustomPage(value);
   if (root === 'albums') return renderAlbums();
   if (root === 'speakers') return renderSpeakers();
   if (root === 'tracks') return renderTrack(value);
@@ -95,6 +109,7 @@ function render() {
 async function loadLibrary() {
   const response = await fetch('/api/library');
   library = await response.json();
+  renderNavigation();
   const scanned = library.scanState.scannedAt ? new Date(library.scanState.scannedAt).toLocaleString() : 'starting scan';
   statusEl.textContent = `${library.tracks.length} tracks loaded · Last scan: ${scanned}`;
   render();
