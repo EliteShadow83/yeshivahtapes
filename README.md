@@ -17,7 +17,7 @@ A sleek audio-library website that runs on Windows and builds browsable pages fr
 - Generates descriptions from embedded metadata such as title, speaker/artist, album, year, genre, and duration.
 - Streams audio locally with browser playback controls.
 - Automatically refreshes the library every 15 minutes.
-- Provides a direct-only management page at `/manage.html` for uploading and deleting recordings and creating custom side-navigation pages that work like predefined searches.
+- Provides a direct-only management page at `/manage.html` for uploading and deleting recordings and creating custom side-navigation pages, and nesting those pages under custom side-navigation subcategories.
 
 ## Audio directory
 

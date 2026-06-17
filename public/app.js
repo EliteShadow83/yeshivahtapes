@@ -3,7 +3,7 @@ const statusEl = document.querySelector('#status');
 const search = document.querySelector('#search');
 const sideNav = document.querySelector('#sideNav');
 const menuButton = document.querySelector('#menuButton');
-let library = { tracks: [], albums: {}, artists: {}, pages: [], scanState: {} };
+let library = { tracks: [], albums: {}, artists: {}, pages: [], categories: [], scanState: {} };
 let query = '';
 
 const esc = (value = '') => String(value).replace(/[&<>"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[char]));
@@ -12,8 +12,10 @@ const trackMatches = (track, text) => [track.title, track.artist, track.album, t
 const filteredTracks = () => library.tracks.filter((track) => trackMatches(track, query));
 
 function renderNavigation() {
-  const customLinks = (library.pages || []).map((page) => `<a href="#/pages/${encodeURIComponent(page)}" data-route="pages">${esc(page)}</a>`).join('');
-  sideNav.innerHTML = `<a href="#/" data-route="home">Library</a><a href="#/albums" data-route="albums">Albums</a><a href="#/speakers" data-route="speakers">Speakers</a>${customLinks}`;
+  const assignedPages = new Set((library.categories || []).flatMap((category) => category.pages || []));
+  const uncategorizedLinks = (library.pages || []).filter((page) => !assignedPages.has(page)).map((page) => `<a href="#/pages/${encodeURIComponent(page)}" data-route="pages">${esc(page)}</a>`).join('');
+  const categoryLinks = (library.categories || []).map((category) => `<div class="nav-group"><p>${esc(category.name)}</p>${(category.pages || []).map((page) => `<a href="#/pages/${encodeURIComponent(page)}" data-route="pages">${esc(page)}</a>`).join('')}</div>`).join('');
+  sideNav.innerHTML = `<a href="#/" data-route="home">Library</a><a href="#/albums" data-route="albums">Albums</a><a href="#/speakers" data-route="speakers">Speakers</a>${categoryLinks}${uncategorizedLinks}`;
 }
 
 function setActive() {

@@ -5,6 +5,10 @@ const message = document.querySelector('#message');
 const pageForm = document.querySelector('#pageForm');
 const pageName = document.querySelector('#pageName');
 const pageList = document.querySelector('#pageList');
+const categoryForm = document.querySelector('#categoryForm');
+const categoryName = document.querySelector('#categoryName');
+const categoryList = document.querySelector('#categoryList');
+let pageData = { pages: [], categories: [] };
 
 const esc = (value = '') => String(value).replace(/[&<>"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[char]));
 
@@ -13,10 +17,19 @@ function setMessage(text, type = 'success') {
   message.className = `status feedback ${type}`;
 }
 
+function categoryOptions(selected = '') {
+  return `<option value="">No subcategory</option>${pageData.categories.map((category) => `<option value="${esc(category.name)}" ${category.name === selected ? 'selected' : ''}>${esc(category.name)}</option>`).join('')}`;
+}
+
 async function loadPages() {
   const response = await fetch('/api/pages');
-  const { pages } = await response.json();
-  pageList.innerHTML = pages.length ? pages.map((page) => `<article class="card"><p class="eyebrow">Side navigation</p><h3>${esc(page)}</h3><p class="meta">Matches recordings containing "${esc(page)}".</p><button class="ghost manage-button" data-page="${esc(page)}">Delete page</button></article>`).join('') : '<div class="empty">No custom pages have been created.</div>';
+  pageData = await response.json();
+  const pageAssignments = new Map();
+  pageData.categories.forEach((category) => (category.pages || []).forEach((page) => pageAssignments.set(page, category.name)));
+
+  categoryList.innerHTML = pageData.categories.length ? pageData.categories.map((category) => `<article class="card"><p class="eyebrow">Subcategory</p><h3>${esc(category.name)}</h3><p class="meta">${category.pages.length || 0} pages nested here.</p><button class="ghost manage-button" data-category="${esc(category.name)}">Delete subcategory</button></article>`).join('') : '<div class="empty">No subcategories have been created.</div>';
+
+  pageList.innerHTML = pageData.pages.length ? pageData.pages.map((page) => `<article class="card"><p class="eyebrow">Side navigation</p><h3>${esc(page)}</h3><p class="meta">Matches recordings containing "${esc(page)}".</p><label for="assign-${esc(page)}">Nest under subcategory</label><select id="assign-${esc(page)}" data-page="${esc(page)}">${categoryOptions(pageAssignments.get(page) || '')}</select><button class="ghost manage-button" data-page="${esc(page)}">Delete page</button></article>`).join('') : '<div class="empty">No custom pages have been created.</div>';
 }
 
 async function loadFiles() {
@@ -48,8 +61,35 @@ pageForm.addEventListener('submit', async (event) => {
   if (!name) { setMessage('Enter a page name before creating a page.', 'warning'); return; }
   const response = await fetch('/api/pages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) });
   const result = await response.json();
-  setMessage(response.ok ? `Page created: ${name}. Current pages: ${result.pages.join(', ')}` : `Page creation failed: ${result.error}`, response.ok ? 'success' : 'error');
+  setMessage(response.ok ? `Page created: ${name}.` : `Page creation failed: ${result.error}`, response.ok ? 'success' : 'error');
   pageForm.reset();
+  loadPages();
+});
+
+categoryForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const name = categoryName.value.trim();
+  if (!name) { setMessage('Enter a subcategory name before creating it.', 'warning'); return; }
+  const response = await fetch('/api/categories', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) });
+  const result = await response.json();
+  setMessage(response.ok ? `Subcategory created: ${name}.` : `Subcategory creation failed: ${result.error}`, response.ok ? 'success' : 'error');
+  categoryForm.reset();
+  loadPages();
+});
+
+pageList.addEventListener('change', async (event) => {
+  const select = event.target.closest('select[data-page]');
+  if (!select) return;
+  const page = select.dataset.page;
+  const previousCategory = pageData.categories.find((category) => (category.pages || []).includes(page));
+  if (previousCategory) await fetch(`/api/categories/pages?category=${encodeURIComponent(previousCategory.name)}&page=${encodeURIComponent(page)}`, { method: 'DELETE' });
+  if (select.value) {
+    const response = await fetch('/api/categories/pages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ category: select.value, page }) });
+    const result = await response.json();
+    setMessage(response.ok ? `Nested ${page} under ${select.value}.` : `Nesting failed: ${result.error}`, response.ok ? 'success' : 'error');
+  } else {
+    setMessage(`${page} moved out of subcategories.`);
+  }
   loadPages();
 });
 
@@ -60,7 +100,18 @@ pageList.addEventListener('click', async (event) => {
   if (!confirm(`Delete page ${name}?`)) return;
   const response = await fetch(`/api/pages?name=${encodeURIComponent(name)}`, { method: 'DELETE' });
   const result = await response.json();
-  setMessage(response.ok ? `Page deleted: ${name}. Remaining pages: ${result.pages.join(', ') || 'none'}` : `Delete failed: ${result.error}`, response.ok ? 'success' : 'error');
+  setMessage(response.ok ? `Page deleted: ${name}.` : `Delete failed: ${result.error}`, response.ok ? 'success' : 'error');
+  loadPages();
+});
+
+categoryList.addEventListener('click', async (event) => {
+  const button = event.target.closest('button[data-category]');
+  if (!button) return;
+  const name = button.dataset.category;
+  if (!confirm(`Delete subcategory ${name}? Pages will remain available.`)) return;
+  const response = await fetch(`/api/categories?name=${encodeURIComponent(name)}`, { method: 'DELETE' });
+  const result = await response.json();
+  setMessage(response.ok ? `Subcategory deleted: ${name}.` : `Delete failed: ${result.error}`, response.ok ? 'success' : 'error');
   loadPages();
 });
 

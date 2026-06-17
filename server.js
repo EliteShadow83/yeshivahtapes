@@ -20,22 +20,35 @@ function json(res, status, data) { res.writeHead(status, { 'Content-Type': MIME_
 function safeJoin(root, requestPath) { const filePath = path.resolve(root, requestPath); if (!filePath.startsWith(path.resolve(root))) return null; return filePath; }
 function cleanFileName(fileName) { return path.basename(fileName || '').replace(/[<>:"/\\|?*\u0000-\u001f]/g, '-'); }
 function cleanPageName(name) { return cleanText(name).replace(/[<>:"/\\|?*\u0000-\u001f]/g, '').slice(0, 80); }
+function cleanCategoryName(name) { return cleanPageName(name); }
 
-function readPages() {
-  if (!fs.existsSync(PAGES_FILE)) return [];
+function normalizePageData(data) {
+  const pages = Array.isArray(data) ? data : data.pages || [];
+  const cleanPages = [...new Set(pages.map(cleanPageName).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  const categories = (Array.isArray(data.categories) ? data.categories : [])
+    .map((category) => ({
+      name: cleanCategoryName(category.name),
+      pages: [...new Set((category.pages || []).map(cleanPageName).filter((page) => cleanPages.includes(page)))]
+    }))
+    .filter((category) => category.name)
+    .sort((a, b) => a.name.localeCompare(b.name));
+  return { pages: cleanPages, categories };
+}
+
+function readPageData() {
+  if (!fs.existsSync(PAGES_FILE)) return { pages: [], categories: [] };
   try {
-    const pages = JSON.parse(fs.readFileSync(PAGES_FILE, 'utf8'));
-    return Array.isArray(pages) ? pages.filter(Boolean).map(cleanPageName).filter(Boolean) : [];
+    return normalizePageData(JSON.parse(fs.readFileSync(PAGES_FILE, 'utf8')));
   } catch (error) {
     console.warn(`Unable to read pages: ${error.message}`);
-    return [];
+    return { pages: [], categories: [] };
   }
 }
 
-function writePages(pages) {
-  const uniquePages = [...new Set(pages.map(cleanPageName).filter(Boolean))].sort((a, b) => a.localeCompare(b));
-  fs.writeFileSync(PAGES_FILE, `${JSON.stringify(uniquePages, null, 2)}\n`);
-  return uniquePages;
+function writePageData(data) {
+  const cleanData = normalizePageData(data);
+  fs.writeFileSync(PAGES_FILE, `${JSON.stringify(cleanData, null, 2)}\n`);
+  return cleanData;
 }
 
 function walkAudioFiles(dir) {
@@ -283,26 +296,83 @@ async function handleCreatePage(req, res) {
   }
   const name = cleanPageName(body.name);
   if (!name) return json(res, 400, { error: 'Page name is required' });
-  return json(res, 200, { pages: writePages([...readPages(), name]) });
+  const pageData = readPageData();
+  return json(res, 200, writePageData({ ...pageData, pages: [...pageData.pages, name] }));
 }
 
 function handleDeletePage(req, res, url) {
   const name = cleanPageName(url.searchParams.get('name'));
   if (!name) return json(res, 400, { error: 'Page name is required' });
-  return json(res, 200, { pages: writePages(readPages().filter((page) => page !== name)) });
+  const pageData = readPageData();
+  return json(res, 200, writePageData({
+    pages: pageData.pages.filter((page) => page !== name),
+    categories: pageData.categories.map((category) => ({ ...category, pages: category.pages.filter((page) => page !== name) }))
+  }));
+}
+
+async function readJsonBody(req) {
+  try {
+    return JSON.parse((await collectBody(req)).toString('utf8') || '{}');
+  } catch (error) {
+    return null;
+  }
+}
+
+async function handleCreateCategory(req, res) {
+  const body = await readJsonBody(req);
+  if (!body) return json(res, 400, { error: 'Invalid category data' });
+  const name = cleanCategoryName(body.name);
+  if (!name) return json(res, 400, { error: 'Category name is required' });
+  const pageData = readPageData();
+  if (!pageData.categories.some((category) => category.name === name)) pageData.categories.push({ name, pages: [] });
+  return json(res, 200, writePageData(pageData));
+}
+
+function handleDeleteCategory(req, res, url) {
+  const name = cleanCategoryName(url.searchParams.get('name'));
+  if (!name) return json(res, 400, { error: 'Category name is required' });
+  const pageData = readPageData();
+  return json(res, 200, writePageData({ ...pageData, categories: pageData.categories.filter((category) => category.name !== name) }));
+}
+
+async function handleAssignPageToCategory(req, res) {
+  const body = await readJsonBody(req);
+  if (!body) return json(res, 400, { error: 'Invalid assignment data' });
+  const categoryName = cleanCategoryName(body.category);
+  const pageName = cleanPageName(body.page);
+  const pageData = readPageData();
+  const category = pageData.categories.find((item) => item.name === categoryName);
+  if (!category || !pageData.pages.includes(pageName)) return json(res, 404, { error: 'Category or page not found' });
+  if (!category.pages.includes(pageName)) category.pages.push(pageName);
+  return json(res, 200, writePageData(pageData));
+}
+
+function handleUnassignPageFromCategory(req, res, url) {
+  const categoryName = cleanCategoryName(url.searchParams.get('category'));
+  const pageName = cleanPageName(url.searchParams.get('page'));
+  const pageData = readPageData();
+  const category = pageData.categories.find((item) => item.name === categoryName);
+  if (!category) return json(res, 404, { error: 'Category not found' });
+  category.pages = category.pages.filter((page) => page !== pageName);
+  return json(res, 200, writePageData(pageData));
 }
 
 scanLibrary();
 setInterval(scanLibrary, RESCAN_INTERVAL_MS);
 http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
-  if (url.pathname === '/api/library') return json(res, 200, { scanState, tracks: libraryCache, albums: groupedBy('album'), artists: groupedBy('artist'), pages: readPages() });
+  const pageData = readPageData();
+  if (url.pathname === '/api/library') return json(res, 200, { scanState, tracks: libraryCache, albums: groupedBy('album'), artists: groupedBy('artist'), ...pageData });
   if (url.pathname.startsWith('/api/tracks/')) return json(res, 200, libraryCache.find((item) => item.id === decodeURIComponent(url.pathname.split('/').pop())) || { error: 'Track not found' });
   if (url.pathname === '/api/upload' && req.method === 'POST') return handleUpload(req, res);
   if (url.pathname === '/api/files' && req.method === 'DELETE') return handleDelete(req, res, url);
-  if (url.pathname === '/api/pages' && req.method === 'GET') return json(res, 200, { pages: readPages() });
+  if (url.pathname === '/api/pages' && req.method === 'GET') return json(res, 200, pageData);
   if (url.pathname === '/api/pages' && req.method === 'POST') return handleCreatePage(req, res);
   if (url.pathname === '/api/pages' && req.method === 'DELETE') return handleDeletePage(req, res, url);
+  if (url.pathname === '/api/categories' && req.method === 'POST') return handleCreateCategory(req, res);
+  if (url.pathname === '/api/categories' && req.method === 'DELETE') return handleDeleteCategory(req, res, url);
+  if (url.pathname === '/api/categories/pages' && req.method === 'POST') return handleAssignPageToCategory(req, res);
+  if (url.pathname === '/api/categories/pages' && req.method === 'DELETE') return handleUnassignPageFromCategory(req, res, url);
   if (url.pathname.startsWith('/media/')) return serveMedia(req, res, url.pathname.slice('/media/'.length));
   const requestPath = url.pathname === '/' ? 'index.html' : url.pathname.slice(1);
   return serveFile(res, safeJoin(PUBLIC_DIR, requestPath) || path.join(PUBLIC_DIR, 'index.html'));

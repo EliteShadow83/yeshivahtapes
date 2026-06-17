@@ -32,7 +32,13 @@
           <input id="pageName" name="pageName" type="text" placeholder="Mussar, Parsha, Daf Yomi...">
           <button class="ghost manage-button" type="submit">Create page</button>
         </form>
+        <form id="categoryForm" class="inline-form">
+          <label for="categoryName">Subcategory name</label>
+          <input id="categoryName" name="categoryName" type="text" placeholder="Daily Learning, Holidays, Speakers...">
+          <button class="ghost manage-button" type="submit">Create subcategory</button>
+        </form>
       </div>
+      <div id="categoryList" class="grid"></div>
       <div id="pageList" class="grid"></div>
       <div class="card">
         <p class="eyebrow">Current recordings</p>
