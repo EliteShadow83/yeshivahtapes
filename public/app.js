@@ -1,7 +1,7 @@
 const app = document.querySelector('#app');
 const statusEl = document.querySelector('#status');
 const search = document.querySelector('#search');
-let library = { tracks: [], albums: {}, scanState: {} };
+let library = { tracks: [], albums: {}, artists: {}, scanState: {} };
 let query = '';
 
 const esc = (value = '') => String(value).replace(/[&<>"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[char]));
@@ -31,6 +31,10 @@ function renderHome() {
   app.innerHTML = tracks.length ? `<div class="grid">${tracks.map(trackCard).join('')}</div>` : `<div class="empty">No recordings are available yet. Please check back soon.</div>`;
 }
 
+function speakerCard(name, tracks) {
+  return `<a class="card" href="#/speakers/${encodeURIComponent(name)}"><p class="eyebrow">${tracks.length} tracks</p><h3>${esc(name)}</h3><p class="meta">${esc([...new Set(tracks.map((track) => track.album))].slice(0, 4).join(' · '))}</p></a>`;
+}
+
 function renderAlbums() {
   const entries = Object.entries(library.albums).sort(([a], [b]) => a.localeCompare(b));
   app.innerHTML = entries.length ? `<div class="grid">${entries.map(([name, tracks]) => albumCard(name, tracks)).join('')}</div>` : `<div class="empty">No albums found yet.</div>`;
@@ -42,6 +46,17 @@ function renderAlbum(name) {
   app.innerHTML = `<p class="eyebrow">Album</p><h3>${esc(decoded)}</h3><br><div class="grid">${tracks.map(trackCard).join('')}</div>`;
 }
 
+function renderSpeakers() {
+  const entries = Object.entries(library.artists).sort(([a], [b]) => a.localeCompare(b));
+  app.innerHTML = entries.length ? `<div class="grid">${entries.map(([name, tracks]) => speakerCard(name, tracks)).join('')}</div>` : `<div class="empty">No speakers found yet.</div>`;
+}
+
+function renderSpeaker(name) {
+  const decoded = decodeURIComponent(name || '');
+  const tracks = library.artists[decoded] || [];
+  app.innerHTML = `<p class="eyebrow">Speaker</p><h3>${esc(decoded)}</h3><br><div class="grid">${tracks.map(trackCard).join('')}</div>`;
+}
+
 function renderTrack(id) {
   const track = library.tracks.find((item) => item.id === id);
   if (!track) { app.innerHTML = '<div class="empty">Track not found.</div>'; return; }
@@ -51,7 +66,7 @@ function renderTrack(id) {
       <h2>${esc(track.title)}</h2>
       <p class="meta">${esc(track.description)}</p>
       <div class="pills">
-        <span class="pill">Speaker: ${esc(track.artist)}</span>
+        <a class="pill" href="#/speakers/${encodeURIComponent(track.artist)}">Speaker: ${esc(track.artist)}</a>
         <a class="pill" href="#/albums/${encodeURIComponent(track.album)}">Album: ${esc(track.album)}</a>
         <span class="pill">File: ${esc(track.fileName)}</span>
         ${track.trackNumber ? `<span class="pill">Track ${track.trackNumber}</span>` : ''}
@@ -70,7 +85,9 @@ function render() {
   const [root, value] = routeParts();
   if (!root) return renderHome();
   if (root === 'albums' && value) return renderAlbum(value);
+  if (root === 'speakers' && value) return renderSpeaker(value);
   if (root === 'albums') return renderAlbums();
+  if (root === 'speakers') return renderSpeakers();
   if (root === 'tracks') return renderTrack(value);
   return renderHome();
 }

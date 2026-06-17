@@ -13,7 +13,7 @@ A sleek audio-library website that runs on Windows and builds browsable pages fr
 
 - Scans MP3, M4A, AAC, FLAC, WAV, OGG, OPUS, and WMA files from the configured folder.
 - Creates individual pages for every audio file.
-- Groups browsing categories by album title.
+- Groups browsing categories by album title and speaker.
 - Generates descriptions from embedded metadata such as title, speaker/artist, album, year, genre, and duration.
 - Streams audio locally with browser playback controls.
 - Automatically refreshes the library every 15 minutes.
