@@ -2,6 +2,7 @@ const app = document.querySelector('#app');
 const statusEl = document.querySelector('#status');
 const search = document.querySelector('#search');
 const sideNav = document.querySelector('#sideNav');
+const menuButton = document.querySelector('#menuButton');
 let library = { tracks: [], albums: {}, artists: {}, pages: [], scanState: {} };
 let query = '';
 
@@ -119,3 +120,14 @@ search.addEventListener('input', (event) => { query = event.target.value.toLower
 window.addEventListener('hashchange', render);
 loadLibrary();
 setInterval(loadLibrary, 60 * 1000);
+
+menuButton.addEventListener('click', () => {
+  const isOpen = document.body.classList.toggle('nav-open');
+  menuButton.setAttribute('aria-expanded', String(isOpen));
+});
+
+sideNav.addEventListener('click', (event) => {
+  if (!event.target.closest('a')) return;
+  document.body.classList.remove('nav-open');
+  menuButton.setAttribute('aria-expanded', 'false');
+});

@@ -28,7 +28,14 @@ input { width:100%; padding:15px 16px; border-radius:14px; border:1px solid var(
 .player { position:sticky; top:24px; }
 audio { width:100%; margin-top:16px; }
 .empty { border:1px dashed var(--line); border-radius:22px; padding:30px; color:var(--muted); background:rgba(255,255,255,.03); }
-@media (max-width: 860px) { .shell,.hero,.track-page{grid-template-columns:1fr;} .sidebar{position:relative;height:auto;} main{padding:18px;} }
+.menu-button { display:none; position:fixed; top:14px; left:14px; z-index:30; padding:11px 14px; border:1px solid var(--line); border-radius:14px; background:rgba(8,12,24,.92); color:var(--text); font-weight:800; box-shadow:0 12px 30px rgba(0,0,0,.3); }
+@media (max-width: 860px) {
+  .menu-button { display:block; }
+  .shell,.hero,.track-page{grid-template-columns:1fr;}
+  .sidebar{position:fixed; z-index:25; inset:0 auto 0 0; width:min(82vw, 310px); height:100vh; transform:translateX(-105%); transition:transform .22s ease; box-shadow:24px 0 80px rgba(0,0,0,.42);}
+  body.nav-open .sidebar{transform:translateX(0);}
+  main{padding:74px 18px 18px;}
+}
 
 .manage-page { padding:36px; min-height:100vh; }
 .manage-button { display:inline-block; width:100%; margin-top:14px; text-align:center; }
