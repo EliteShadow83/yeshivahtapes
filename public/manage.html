@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Manage Audio Library</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main class="manage-page">
+    <section class="hero">
+      <div>
+        <p class="eyebrow">Private management</p>
+        <h2>Upload or delete recordings.</h2>
+        <p>This page is intentionally not linked from the public library. Access it directly at <strong>/manage.html</strong>.</p>
+      </div>
+      <form id="uploadForm" class="search-card">
+        <label for="audioFiles">Upload audio files</label>
+        <input id="audioFiles" name="audioFiles" type="file" accept="audio/*" multiple>
+        <button class="ghost manage-button" type="submit">Upload selected files</button>
+      </form>
+    </section>
+
+    <section id="message" class="status feedback" role="status" aria-live="polite">Upload and page updates will appear here.</section>
+    <section class="content">
+      <div class="card">
+        <p class="eyebrow">Navigation pages</p>
+        <h3>Create side navigation pages</h3>
+        <p class="meta">Each page acts like a predefined search. A page named “Mussar” will show recordings whose title, speaker, album, genre, or description contains “Mussar”.</p>
+        <form id="pageForm" class="inline-form">
+          <label for="pageName">Page name</label>
+          <input id="pageName" name="pageName" type="text" placeholder="Mussar, Parsha, Daf Yomi...">
+          <button class="ghost manage-button" type="submit">Create page</button>
+        </form>
+        <form id="categoryForm" class="inline-form">
+          <label for="categoryName">Subcategory name</label>
+          <input id="categoryName" name="categoryName" type="text" placeholder="Daily Learning, Holidays, Speakers...">
+          <button class="ghost manage-button" type="submit">Create subcategory</button>
+        </form>
+      </div>
+      <div id="categoryList" class="grid"></div>
+      <div id="pageList" class="grid"></div>
+      <div class="card">
+        <p class="eyebrow">Current recordings</p>
+        <h3>Delete files</h3>
+        <p class="meta">Deleting removes the audio file from the library folder.</p>
+      </div>
+      <div id="fileList" class="grid"></div>
+    </section>
+  </main>
+  <script src="/manage.js"></script>
+</body>
+</html>
