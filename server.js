@@ -39,6 +39,70 @@ function decodeId3Text(buffer) {
 
 function syncSafeInt(buffer) { return (buffer[0] << 21) | (buffer[1] << 14) | (buffer[2] << 7) | buffer[3]; }
 
+function mp3TagOffset(filePath) {
+  const header = Buffer.alloc(10);
+  const fd = fs.openSync(filePath, 'r');
+  try {
+    if (fs.readSync(fd, header, 0, 10, 0) < 10) return 0;
+    if (header.toString('ascii', 0, 3) !== 'ID3') return 0;
+    return 10 + syncSafeInt(header.subarray(6, 10));
+  } finally { fs.closeSync(fd); }
+}
+
+function parseMp3FrameHeader(header) {
+  if (header.length < 4 || header[0] !== 0xff || (header[1] & 0xe0) !== 0xe0) return null;
+  const versionBits = (header[1] >> 3) & 0x03;
+  const layerBits = (header[1] >> 1) & 0x03;
+  const bitrateIndex = (header[2] >> 4) & 0x0f;
+  const sampleRateIndex = (header[2] >> 2) & 0x03;
+  const padding = (header[2] >> 1) & 0x01;
+  if (versionBits === 1 || layerBits === 0 || bitrateIndex === 0 || bitrateIndex === 15 || sampleRateIndex === 3) return null;
+
+  const version = versionBits === 3 ? '1' : versionBits === 2 ? '2' : '2.5';
+  const layer = layerBits === 3 ? 1 : layerBits === 2 ? 2 : 3;
+  const bitrates = {
+    '1': {
+      1: [0,32,64,96,128,160,192,224,256,288,320,352,384,416,448],
+      2: [0,32,48,56,64,80,96,112,128,160,192,224,256,320,384],
+      3: [0,32,40,48,56,64,80,96,112,128,160,192,224,256,320]
+    },
+    '2': {
+      1: [0,32,48,56,64,80,96,112,128,144,160,176,192,224,256],
+      2: [0,8,16,24,32,40,48,56,64,80,96,112,128,144,160],
+      3: [0,8,16,24,32,40,48,56,64,80,96,112,128,144,160]
+    },
+    '2.5': {
+      1: [0,32,48,56,64,80,96,112,128,144,160,176,192,224,256],
+      2: [0,8,16,24,32,40,48,56,64,80,96,112,128,144,160],
+      3: [0,8,16,24,32,40,48,56,64,80,96,112,128,144,160]
+    }
+  };
+  const sampleRates = { '1': [44100, 48000, 32000], '2': [22050, 24000, 16000], '2.5': [11025, 12000, 8000] };
+  const bitrate = bitrates[version][layer][bitrateIndex] * 1000;
+  const sampleRate = sampleRates[version][sampleRateIndex];
+  const samplesPerFrame = layer === 1 ? 384 : (layer === 3 && version !== '1' ? 576 : 1152);
+  const frameLength = layer === 1 ? Math.floor(((12 * bitrate) / sampleRate + padding) * 4) : Math.floor(((version === '1' ? 144 : 72) * bitrate) / sampleRate + padding);
+  if (!bitrate || !sampleRate || !frameLength) return null;
+  return { bitrate, sampleRate, frameLength, samplesPerFrame };
+}
+
+function readMp3Duration(filePath, tagOffset) {
+  const stat = fs.statSync(filePath);
+  const fd = fs.openSync(filePath, 'r');
+  try {
+    const scanSize = Math.min(65536, Math.max(0, stat.size - tagOffset));
+    const buffer = Buffer.alloc(scanSize);
+    fs.readSync(fd, buffer, 0, scanSize, tagOffset);
+    for (let offset = 0; offset + 4 <= buffer.length; offset += 1) {
+      const frame = parseMp3FrameHeader(buffer.subarray(offset, offset + 4));
+      if (!frame) continue;
+      const audioBytes = stat.size - tagOffset - offset;
+      return audioBytes * 8 / frame.bitrate;
+    }
+  } finally { fs.closeSync(fd); }
+  return null;
+}
+
 function readMp3Metadata(filePath) {
   const fd = fs.openSync(filePath, 'r');
   try {
@@ -49,7 +113,7 @@ function readMp3Metadata(filePath) {
     const tagSize = syncSafeInt(header.subarray(6, 10));
     const tag = Buffer.alloc(tagSize);
     fs.readSync(fd, tag, 0, tagSize, 10);
-    const map = { TIT2: 'title', TPE1: 'artist', TPE2: 'artist', TALB: 'album', TCON: 'genre', TYER: 'year', TDRC: 'year', TRCK: 'trackNumber' };
+    const map = { TIT2: 'title', TPE1: 'artist', TPE2: 'artist', TALB: 'album', TCON: 'genre', TYER: 'year', TDRC: 'year', TRCK: 'trackNumber', TLEN: 'durationMs' };
     const metadata = {};
     let offset = 0;
     while (offset + 10 <= tag.length) {
@@ -77,7 +141,13 @@ function readWavMetadata(filePath) {
 
 function readMetadata(filePath) {
   const ext = path.extname(filePath).toLowerCase();
-  if (ext === '.mp3') return readMp3Metadata(filePath);
+  if (ext === '.mp3') {
+    const tagOffset = mp3TagOffset(filePath);
+    const metadata = readMp3Metadata(filePath);
+    const tagDuration = metadata.durationMs ? Number.parseInt(metadata.durationMs, 10) / 1000 : null;
+    metadata.duration = tagDuration || readMp3Duration(filePath, tagOffset);
+    return metadata;
+  }
   if (ext === '.wav') return readWavMetadata(filePath);
   return {};
 }
@@ -92,8 +162,9 @@ function readTrack(filePath, index) {
   const year = meta.year || '';
   const genre = meta.genre || 'Uncategorized';
   const trackNumber = meta.trackNumber ? Number.parseInt(String(meta.trackNumber).split('/')[0], 10) : null;
-  const description = [title, artist !== 'Unknown Speaker' ? `presented by ${artist}` : '', album !== 'Unknown Album' ? `from ${album}` : '', year ? `released in ${year}` : '', genre !== 'Uncategorized' ? `genre: ${genre}` : '', meta.comment || ''].filter(Boolean).join(' · ');
-  return { id: `${slugify(artist)}-${slugify(album)}-${slugify(title)}-${index}`, title, artist, album, year, genre, trackNumber, duration: null, durationLabel: durationLabel(null), fileName: path.basename(filePath), relPath, modifiedAt: stats.mtime.toISOString(), description, streamUrl: `/media/${encodeURIComponent(relPath)}` };
+  const duration = meta.duration || null;
+  const description = [title, artist !== 'Unknown Speaker' ? `presented by ${artist}` : '', album !== 'Unknown Album' ? `from ${album}` : '', year ? `released in ${year}` : '', genre !== 'Uncategorized' ? `genre: ${genre}` : '', duration ? `duration ${durationLabel(duration)}` : '', meta.comment || ''].filter(Boolean).join(' · ');
+  return { id: `${slugify(artist)}-${slugify(album)}-${slugify(title)}-${index}`, title, artist, album, year, genre, trackNumber, duration, durationLabel: durationLabel(duration), fileName: path.basename(filePath), relPath, modifiedAt: stats.mtime.toISOString(), description, streamUrl: `/media/${encodeURIComponent(relPath)}` };
 }
 
 function scanLibrary() {
