@@ -4,6 +4,7 @@ const path = require('path');
 const { URL } = require('url');
 
 const PORT = process.env.PORT || 3131;
+const RESCAN_INTERVAL_MS = 15 * 60 * 1000;
 const AUDIO_DIR = process.env.AUDIO_DIR || path.join(__dirname, 'audio');
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const AUDIO_EXTENSIONS = new Set(['.mp3', '.m4a', '.aac', '.flac', '.wav', '.ogg', '.opus', '.wma']);
@@ -86,12 +87,12 @@ function readTrack(filePath, index) {
   const meta = readMetadata(filePath);
   const relPath = path.relative(AUDIO_DIR, filePath).replace(/\\/g, '/');
   const title = meta.title || path.basename(filePath, path.extname(filePath));
-  const artist = meta.artist || 'Unknown Artist';
+  const artist = meta.artist || 'Unknown Speaker';
   const album = meta.album || 'Unknown Album';
   const year = meta.year || '';
   const genre = meta.genre || 'Uncategorized';
   const trackNumber = meta.trackNumber ? Number.parseInt(String(meta.trackNumber).split('/')[0], 10) : null;
-  const description = [title, artist !== 'Unknown Artist' ? `performed by ${artist}` : '', album !== 'Unknown Album' ? `from ${album}` : '', year ? `released in ${year}` : '', genre !== 'Uncategorized' ? `genre: ${genre}` : '', meta.comment || ''].filter(Boolean).join(' · ');
+  const description = [title, artist !== 'Unknown Speaker' ? `presented by ${artist}` : '', album !== 'Unknown Album' ? `from ${album}` : '', year ? `released in ${year}` : '', genre !== 'Uncategorized' ? `genre: ${genre}` : '', meta.comment || ''].filter(Boolean).join(' · ');
   return { id: `${slugify(artist)}-${slugify(album)}-${slugify(title)}-${index}`, title, artist, album, year, genre, trackNumber, duration: null, durationLabel: durationLabel(null), fileName: path.basename(filePath), relPath, modifiedAt: stats.mtime.toISOString(), description, streamUrl: `/media/${encodeURIComponent(relPath)}` };
 }
 
@@ -127,12 +128,12 @@ function serveMedia(req, res, relPath) {
 }
 
 scanLibrary();
+setInterval(scanLibrary, RESCAN_INTERVAL_MS);
 http.createServer((req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
-  if (url.pathname === '/api/library') return json(res, 200, { audioDirectory: AUDIO_DIR, scanState, tracks: libraryCache, albums: groupedBy('album'), artists: groupedBy('artist') });
-  if (url.pathname === '/api/rescan' && req.method === 'POST') { scanLibrary(); return json(res, 200, { ok: true, scanState }); }
+  if (url.pathname === '/api/library') return json(res, 200, { scanState, tracks: libraryCache, albums: groupedBy('album'), artists: groupedBy('artist') });
   if (url.pathname.startsWith('/api/tracks/')) return json(res, 200, libraryCache.find((item) => item.id === decodeURIComponent(url.pathname.split('/').pop())) || { error: 'Track not found' });
   if (url.pathname.startsWith('/media/')) return serveMedia(req, res, url.pathname.slice('/media/'.length));
   const requestPath = url.pathname === '/' ? 'index.html' : url.pathname.slice(1);
   return serveFile(res, safeJoin(PUBLIC_DIR, requestPath) || path.join(PUBLIC_DIR, 'index.html'));
-}).listen(PORT, () => { console.log(`Audio library running at http://localhost:${PORT}`); console.log(`Reading audio files from: ${AUDIO_DIR}`); });
+}).listen(PORT, () => { console.log(`Audio library running at http://localhost:${PORT}`); console.log(`Reading audio files from: ${AUDIO_DIR}`); console.log('Library rescans every 15 minutes.'); });

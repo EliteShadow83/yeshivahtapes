@@ -10,7 +10,6 @@ h1,h2,h3,p { margin:0; } h1{font-size:23px;} h2{font-size:clamp(32px,5vw,64px); 
 .eyebrow { color:var(--accent2); text-transform:uppercase; letter-spacing:.14em; font-size:12px; font-weight:700; margin-bottom:8px; }
 nav { display:grid; gap:10px; } nav a, .ghost { padding:13px 15px; border:1px solid var(--line); border-radius:14px; background:rgba(255,255,255,.04); color:var(--text); cursor:pointer; font-weight:700; text-align:left; }
 nav a.active, nav a:hover, .ghost:hover { background:linear-gradient(135deg,rgba(124,58,237,.35),rgba(34,211,238,.14)); border-color:rgba(34,211,238,.4); }
-.folder { color:var(--muted); font-size:13px; line-height:1.5; word-break:break-word; margin-top:auto; }
 main { padding:36px; overflow:hidden; }
 .hero { display:grid; grid-template-columns:minmax(0,1fr) 330px; gap:24px; align-items:end; padding:34px; border:1px solid var(--line); border-radius:30px; background:linear-gradient(135deg,rgba(255,255,255,.08),rgba(255,255,255,.02)); box-shadow:0 24px 80px rgba(0,0,0,.25); }
 .hero p:not(.eyebrow) { max-width:720px; color:var(--muted); margin-top:18px; font-size:17px; line-height:1.7; }

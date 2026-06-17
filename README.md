@@ -1,6 +1,6 @@
 # Yeshivah Tapes Audio Library
 
-A local, sleek audio-library website that runs on Windows and builds browsable pages from audio-file metadata.
+A sleek audio-library website that runs on Windows and builds browsable pages from audio-file metadata.
 
 ## Windows launch
 
@@ -13,10 +13,10 @@ A local, sleek audio-library website that runs on Windows and builds browsable p
 
 - Scans MP3, M4A, AAC, FLAC, WAV, OGG, OPUS, and WMA files from the configured folder.
 - Creates individual pages for every audio file.
-- Groups browsing by album title and by artist.
-- Generates descriptions from embedded metadata such as title, artist, album, year, genre, and duration.
+- Groups browsing by album title and by speaker.
+- Generates descriptions from embedded metadata such as title, speaker/artist, album, year, genre, and duration.
 - Streams audio locally with browser playback controls.
-- Includes a Rescan button for newly added files.
+- Automatically refreshes the library every 15 minutes.
 
 ## Configuration
 

@@ -1,8 +1,6 @@
 const app = document.querySelector('#app');
 const statusEl = document.querySelector('#status');
 const search = document.querySelector('#search');
-const folder = document.querySelector('#folder');
-const rescan = document.querySelector('#rescan');
 let library = { tracks: [], albums: {}, artists: {}, scanState: {} };
 let query = '';
 
@@ -26,13 +24,13 @@ function trackCard(track) {
 
 function renderHome() {
   const tracks = filteredTracks();
-  app.innerHTML = tracks.length ? `<div class="grid">${tracks.map(trackCard).join('')}</div>` : `<div class="empty">No audio files found. Add supported files to the audio folder, then click Rescan folder.</div>`;
+  app.innerHTML = tracks.length ? `<div class="grid">${tracks.map(trackCard).join('')}</div>` : `<div class="empty">No recordings are available yet. Please check back soon.</div>`;
 }
 
 function renderGroups(type) {
   const groups = type === 'albums' ? library.albums : library.artists;
   const entries = Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
-  app.innerHTML = entries.length ? `<div class="grid">${entries.map(([name, tracks]) => `<a class="card" href="#/${type}/${encodeURIComponent(name)}"><p class="eyebrow">${tracks.length} tracks</p><h3>${esc(name)}</h3><p class="meta">${esc([...new Set(tracks.map((track) => type === 'albums' ? track.artist : track.album))].slice(0, 4).join(' · '))}</p></a>`).join('')}</div>` : `<div class="empty">No ${type} found yet.</div>`;
+  app.innerHTML = entries.length ? `<div class="grid">${entries.map(([name, tracks]) => `<a class="card" href="#/${type}/${encodeURIComponent(name)}"><p class="eyebrow">${tracks.length} tracks</p><h3>${esc(name)}</h3><p class="meta">${esc([...new Set(tracks.map((track) => type === 'albums' ? track.artist : track.album))].slice(0, 4).join(' · '))}</p></a>`).join('')}</div>` : `<div class="empty">No ${type === 'speakers' ? 'speakers' : type} found yet.</div>`;
 }
 
 function renderGroup(type, name) {
@@ -50,7 +48,7 @@ function renderTrack(id) {
       <h2>${esc(track.title)}</h2>
       <p class="meta">${esc(track.description)}</p>
       <div class="pills">
-        <a class="pill" href="#/artists/${encodeURIComponent(track.artist)}">Artist: ${esc(track.artist)}</a>
+        <a class="pill" href="#/speakers/${encodeURIComponent(track.artist)}">Speaker: ${esc(track.artist)}</a>
         <a class="pill" href="#/albums/${encodeURIComponent(track.album)}">Album: ${esc(track.album)}</a>
         <span class="pill">File: ${esc(track.fileName)}</span>
         ${track.trackNumber ? `<span class="pill">Track ${track.trackNumber}</span>` : ''}
@@ -69,8 +67,9 @@ function render() {
   const [root, value] = routeParts();
   if (!root) return renderHome();
   if (root === 'albums' && value) return renderGroup('albums', value);
-  if (root === 'artists' && value) return renderGroup('artists', value);
-  if (root === 'albums' || root === 'artists') return renderGroups(root);
+  if ((root === 'speakers' || root === 'artists') && value) return renderGroup('speakers', value);
+  if (root === 'albums') return renderGroups(root);
+  if (root === 'speakers' || root === 'artists') return renderGroups('speakers');
   if (root === 'tracks') return renderTrack(value);
   return renderHome();
 }
@@ -78,7 +77,6 @@ function render() {
 async function loadLibrary() {
   const response = await fetch('/api/library');
   library = await response.json();
-  folder.textContent = `Audio folder: ${library.audioDirectory}`;
   const scanned = library.scanState.scannedAt ? new Date(library.scanState.scannedAt).toLocaleString() : 'starting scan';
   statusEl.textContent = `${library.tracks.length} tracks loaded · Last scan: ${scanned}`;
   render();
@@ -86,5 +84,5 @@ async function loadLibrary() {
 
 search.addEventListener('input', (event) => { query = event.target.value.toLowerCase(); renderHome(); });
 window.addEventListener('hashchange', render);
-rescan.addEventListener('click', async () => { await fetch('/api/rescan', { method: 'POST' }); setTimeout(loadLibrary, 900); });
 loadLibrary();
+setInterval(loadLibrary, 60 * 1000);
