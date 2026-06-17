@@ -8,8 +8,9 @@ const pageList = document.querySelector('#pageList');
 
 const esc = (value = '') => String(value).replace(/[&<>"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[char]));
 
-function setMessage(text) {
+function setMessage(text, type = 'success') {
   message.textContent = text;
+  message.className = `status feedback ${type}`;
 }
 
 async function loadPages() {
@@ -31,24 +32,23 @@ async function loadFiles() {
 
 uploadForm.addEventListener('submit', async (event) => {
   event.preventDefault();
-  if (!audioFiles.files.length) { setMessage('Choose one or more audio files to upload.'); return; }
+  if (!audioFiles.files.length) { setMessage('Choose one or more audio files to upload.', 'warning'); return; }
   const formData = new FormData();
   [...audioFiles.files].forEach((file) => formData.append('audioFiles', file));
   const response = await fetch('/api/upload', { method: 'POST', body: formData });
   const result = await response.json();
-  setMessage(response.ok ? `Uploaded: ${result.uploaded.join(', ')}` : result.error);
+  setMessage(response.ok ? `Upload complete: ${result.uploaded.join(', ')}` : `Upload failed: ${result.error}`, response.ok ? 'success' : 'error');
   uploadForm.reset();
-  loadPages();
-loadFiles();
+  loadFiles();
 });
 
 pageForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   const name = pageName.value.trim();
-  if (!name) { setMessage('Enter a page name.'); return; }
+  if (!name) { setMessage('Enter a page name before creating a page.', 'warning'); return; }
   const response = await fetch('/api/pages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) });
   const result = await response.json();
-  setMessage(response.ok ? `Saved pages: ${result.pages.join(', ')}` : result.error);
+  setMessage(response.ok ? `Page created: ${name}. Current pages: ${result.pages.join(', ')}` : `Page creation failed: ${result.error}`, response.ok ? 'success' : 'error');
   pageForm.reset();
   loadPages();
 });
@@ -60,7 +60,7 @@ pageList.addEventListener('click', async (event) => {
   if (!confirm(`Delete page ${name}?`)) return;
   const response = await fetch(`/api/pages?name=${encodeURIComponent(name)}`, { method: 'DELETE' });
   const result = await response.json();
-  setMessage(response.ok ? `Saved pages: ${result.pages.join(', ') || 'none'}` : result.error);
+  setMessage(response.ok ? `Page deleted: ${name}. Remaining pages: ${result.pages.join(', ') || 'none'}` : `Delete failed: ${result.error}`, response.ok ? 'success' : 'error');
   loadPages();
 });
 
@@ -71,9 +71,8 @@ fileList.addEventListener('click', async (event) => {
   if (!confirm(`Delete ${relPath}?`)) return;
   const response = await fetch(`/api/files?path=${encodeURIComponent(relPath)}`, { method: 'DELETE' });
   const result = await response.json();
-  setMessage(response.ok ? `Deleted: ${result.deleted}` : result.error);
-  loadPages();
-loadFiles();
+  setMessage(response.ok ? `Deleted recording: ${result.deleted}` : `Delete failed: ${result.error}`, response.ok ? 'success' : 'error');
+  loadFiles();
 });
 
 loadPages();

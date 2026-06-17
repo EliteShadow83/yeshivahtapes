@@ -37,6 +37,12 @@ audio { width:100%; margin-top:16px; }
   main{padding:74px 18px 18px;}
 }
 
+@media (min-width: 861px) { .menu-button { display:none !important; } }
+.feedback { border:1px solid var(--line); border-radius:18px; padding:14px 16px; background:rgba(255,255,255,.05); color:var(--text); font-weight:700; }
+.feedback.success { border-color:rgba(34,197,94,.55); background:rgba(34,197,94,.14); }
+.feedback.warning { border-color:rgba(250,204,21,.55); background:rgba(250,204,21,.12); }
+.feedback.error { border-color:rgba(248,113,113,.65); background:rgba(248,113,113,.14); }
+
 .manage-page { padding:36px; min-height:100vh; }
 .manage-button { display:inline-block; width:100%; margin-top:14px; text-align:center; }
 .inline-form { margin-top:16px; }
