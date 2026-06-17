@@ -90,15 +90,19 @@ function readMp3Duration(filePath, tagOffset) {
   const stat = fs.statSync(filePath);
   const fd = fs.openSync(filePath, 'r');
   try {
-    const scanSize = Math.min(65536, Math.max(0, stat.size - tagOffset));
+    const scanSize = Math.max(0, stat.size - tagOffset);
     const buffer = Buffer.alloc(scanSize);
     fs.readSync(fd, buffer, 0, scanSize, tagOffset);
+    let totalSamples = 0;
+    let sampleRate = null;
     for (let offset = 0; offset + 4 <= buffer.length; offset += 1) {
       const frame = parseMp3FrameHeader(buffer.subarray(offset, offset + 4));
       if (!frame) continue;
-      const audioBytes = stat.size - tagOffset - offset;
-      return audioBytes * 8 / frame.bitrate;
+      totalSamples += frame.samplesPerFrame;
+      sampleRate = sampleRate || frame.sampleRate;
+      offset += Math.max(frame.frameLength - 1, 0);
     }
+    if (totalSamples && sampleRate) return totalSamples / sampleRate;
   } finally { fs.closeSync(fd); }
   return null;
 }

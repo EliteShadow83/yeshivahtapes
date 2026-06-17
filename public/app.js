@@ -1,7 +1,7 @@
 const app = document.querySelector('#app');
 const statusEl = document.querySelector('#status');
 const search = document.querySelector('#search');
-let library = { tracks: [], albums: {}, artists: {}, scanState: {} };
+let library = { tracks: [], albums: {}, scanState: {} };
 let query = '';
 
 const esc = (value = '') => String(value).replace(/[&<>"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[char]));
@@ -22,21 +22,30 @@ function trackCard(track) {
   </a>`;
 }
 
+function albumCard(name, tracks) {
+  return `<a class="card" href="#/albums/${encodeURIComponent(name)}"><p class="eyebrow">${tracks.length} tracks</p><h3>${esc(name)}</h3><p class="meta">${esc([...new Set(tracks.map((track) => track.artist))].slice(0, 4).join(' · '))}</p></a>`;
+}
+
 function renderHome() {
   const tracks = filteredTracks();
-  app.innerHTML = tracks.length ? `<div class="grid">${tracks.map(trackCard).join('')}</div>` : `<div class="empty">No recordings are available yet. Please check back soon.</div>`;
+  if (!tracks.length) { app.innerHTML = `<div class="empty">No recordings are available yet. Please check back soon.</div>`; return; }
+  const albums = tracks.reduce((groups, track) => {
+    groups[track.album] = groups[track.album] || [];
+    groups[track.album].push(track);
+    return groups;
+  }, {});
+  app.innerHTML = `<div class="grid">${Object.entries(albums).sort(([a], [b]) => a.localeCompare(b)).map(([name, albumTracks]) => albumCard(name, albumTracks)).join('')}</div>`;
 }
 
-function renderGroups(type) {
-  const groups = type === 'albums' ? library.albums : library.artists;
-  const entries = Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
-  app.innerHTML = entries.length ? `<div class="grid">${entries.map(([name, tracks]) => `<a class="card" href="#/${type}/${encodeURIComponent(name)}"><p class="eyebrow">${tracks.length} tracks</p><h3>${esc(name)}</h3><p class="meta">${esc([...new Set(tracks.map((track) => type === 'albums' ? track.artist : track.album))].slice(0, 4).join(' · '))}</p></a>`).join('')}</div>` : `<div class="empty">No ${type === 'speakers' ? 'speakers' : type} found yet.</div>`;
+function renderAlbums() {
+  const entries = Object.entries(library.albums).sort(([a], [b]) => a.localeCompare(b));
+  app.innerHTML = entries.length ? `<div class="grid">${entries.map(([name, tracks]) => albumCard(name, tracks)).join('')}</div>` : `<div class="empty">No albums found yet.</div>`;
 }
 
-function renderGroup(type, name) {
+function renderAlbum(name) {
   const decoded = decodeURIComponent(name || '');
-  const tracks = (type === 'albums' ? library.albums[decoded] : library.artists[decoded]) || [];
-  app.innerHTML = `<p class="eyebrow">${type.slice(0, -1)}</p><h3>${esc(decoded)}</h3><br><div class="grid">${tracks.map(trackCard).join('')}</div>`;
+  const tracks = library.albums[decoded] || [];
+  app.innerHTML = `<p class="eyebrow">Album</p><h3>${esc(decoded)}</h3><br><div class="grid">${tracks.map(trackCard).join('')}</div>`;
 }
 
 function renderTrack(id) {
@@ -48,7 +57,7 @@ function renderTrack(id) {
       <h2>${esc(track.title)}</h2>
       <p class="meta">${esc(track.description)}</p>
       <div class="pills">
-        <a class="pill" href="#/speakers/${encodeURIComponent(track.artist)}">Speaker: ${esc(track.artist)}</a>
+        <span class="pill">Speaker: ${esc(track.artist)}</span>
         <a class="pill" href="#/albums/${encodeURIComponent(track.album)}">Album: ${esc(track.album)}</a>
         <span class="pill">File: ${esc(track.fileName)}</span>
         ${track.trackNumber ? `<span class="pill">Track ${track.trackNumber}</span>` : ''}
@@ -66,10 +75,8 @@ function render() {
   setActive();
   const [root, value] = routeParts();
   if (!root) return renderHome();
-  if (root === 'albums' && value) return renderGroup('albums', value);
-  if ((root === 'speakers' || root === 'artists') && value) return renderGroup('speakers', value);
-  if (root === 'albums') return renderGroups(root);
-  if (root === 'speakers' || root === 'artists') return renderGroups('speakers');
+  if (root === 'albums' && value) return renderAlbum(value);
+  if (root === 'albums') return renderAlbums();
   if (root === 'tracks') return renderTrack(value);
   return renderHome();
 }
