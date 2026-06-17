@@ -17,6 +17,7 @@ function cleanText(value) { return String(value || '').replace(/\u0000/g, '').tr
 function durationLabel(seconds) { if (!seconds || Number.isNaN(seconds)) return 'Unknown length'; const rounded = Math.round(seconds); return `${Math.floor(rounded / 60)}:${String(rounded % 60).padStart(2, '0')}`; }
 function json(res, status, data) { res.writeHead(status, { 'Content-Type': MIME_TYPES['.json'] }); res.end(JSON.stringify(data)); }
 function safeJoin(root, requestPath) { const filePath = path.resolve(root, requestPath); if (!filePath.startsWith(path.resolve(root))) return null; return filePath; }
+function cleanFileName(fileName) { return path.basename(fileName || '').replace(/[<>:"/\\|?*\u0000-\u001f]/g, '-'); }
 
 function walkAudioFiles(dir) {
   if (!fs.existsSync(dir)) { fs.mkdirSync(dir, { recursive: true }); return []; }
@@ -202,12 +203,66 @@ function serveMedia(req, res, relPath) {
   fs.createReadStream(filePath, { start, end }).pipe(res);
 }
 
+function collectBody(req) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    req.on('data', (chunk) => chunks.push(chunk));
+    req.on('end', () => resolve(Buffer.concat(chunks)));
+    req.on('error', reject);
+  });
+}
+
+async function handleUpload(req, res) {
+  const contentType = req.headers['content-type'] || '';
+  const boundaryMatch = contentType.match(/boundary=(?:"([^"]+)"|([^;]+))/);
+  if (!boundaryMatch) return json(res, 400, { error: 'Missing upload boundary' });
+  const boundary = `--${boundaryMatch[1] || boundaryMatch[2]}`;
+  const body = await collectBody(req);
+  const parts = body.toString('binary').split(boundary);
+  const uploaded = [];
+
+  for (const part of parts) {
+    const headerEnd = part.indexOf('\r\n\r\n');
+    if (headerEnd === -1) continue;
+    const headers = part.slice(0, headerEnd);
+    const nameMatch = headers.match(/name="audioFiles"/);
+    const fileMatch = headers.match(/filename="([^"]+)"/);
+    if (!nameMatch || !fileMatch) continue;
+
+    const fileName = cleanFileName(fileMatch[1]);
+    if (!fileName || !AUDIO_EXTENSIONS.has(path.extname(fileName).toLowerCase())) continue;
+    const filePath = safeJoin(AUDIO_DIR, fileName);
+    if (!filePath) continue;
+
+    let content = Buffer.from(part.slice(headerEnd + 4), 'binary');
+    if (content.subarray(-2).toString() === '\r\n') content = content.subarray(0, -2);
+    fs.mkdirSync(AUDIO_DIR, { recursive: true });
+    fs.writeFileSync(filePath, content);
+    uploaded.push(fileName);
+  }
+
+  scanLibrary();
+  return json(res, uploaded.length ? 200 : 400, uploaded.length ? { uploaded } : { error: 'No supported audio files were uploaded' });
+}
+
+function handleDelete(req, res, url) {
+  const relPath = url.searchParams.get('path');
+  if (!relPath) return json(res, 400, { error: 'Missing file path' });
+  const filePath = safeJoin(AUDIO_DIR, relPath);
+  if (!filePath || !fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) return json(res, 404, { error: 'File not found' });
+  fs.unlinkSync(filePath);
+  scanLibrary();
+  return json(res, 200, { deleted: relPath });
+}
+
 scanLibrary();
 setInterval(scanLibrary, RESCAN_INTERVAL_MS);
-http.createServer((req, res) => {
+http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
   if (url.pathname === '/api/library') return json(res, 200, { scanState, tracks: libraryCache, albums: groupedBy('album'), artists: groupedBy('artist') });
   if (url.pathname.startsWith('/api/tracks/')) return json(res, 200, libraryCache.find((item) => item.id === decodeURIComponent(url.pathname.split('/').pop())) || { error: 'Track not found' });
+  if (url.pathname === '/api/upload' && req.method === 'POST') return handleUpload(req, res);
+  if (url.pathname === '/api/files' && req.method === 'DELETE') return handleDelete(req, res, url);
   if (url.pathname.startsWith('/media/')) return serveMedia(req, res, url.pathname.slice('/media/'.length));
   const requestPath = url.pathname === '/' ? 'index.html' : url.pathname.slice(1);
   return serveFile(res, safeJoin(PUBLIC_DIR, requestPath) || path.join(PUBLIC_DIR, 'index.html'));

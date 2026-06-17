@@ -29,3 +29,6 @@ input { width:100%; padding:15px 16px; border-radius:14px; border:1px solid var(
 audio { width:100%; margin-top:16px; }
 .empty { border:1px dashed var(--line); border-radius:22px; padding:30px; color:var(--muted); background:rgba(255,255,255,.03); }
 @media (max-width: 860px) { .shell,.hero,.track-page{grid-template-columns:1fr;} .sidebar{position:relative;height:auto;} main{padding:18px;} }
+
+.manage-page { padding:36px; min-height:100vh; }
+.manage-button { display:inline-block; width:100%; margin-top:14px; text-align:center; }
