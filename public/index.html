@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Yeshivah Tapes Audio Library</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="logo">♪</div>
+        <div>
+          <p class="eyebrow">Local archive</p>
+          <h1>Yeshivah Tapes</h1>
+        </div>
+      </div>
+      <nav>
+        <a href="#/" data-route="home">Library</a>
+        <a href="#/albums" data-route="albums">Albums</a>
+        <a href="#/artists" data-route="artists">Artists</a>
+      </nav>
+      <button id="rescan" class="ghost">Rescan folder</button>
+      <p class="folder" id="folder"></p>
+    </aside>
+
+    <main>
+      <section class="hero">
+        <div>
+          <p class="eyebrow">Metadata-powered collection</p>
+          <h2>Browse sermons, shiurim, music, and tapes by artist or album.</h2>
+          <p>Drop audio files into the configured Windows folder and the site builds pages, descriptions, artists, albums, and playable streams from file metadata.</p>
+        </div>
+        <div class="search-card">
+          <label for="search">Search library</label>
+          <input id="search" type="search" placeholder="Title, artist, album, genre...">
+        </div>
+      </section>
+
+      <section id="status" class="status"></section>
+      <section id="app" class="content"></section>
+    </main>
+  </div>
+  <script src="/app.js"></script>
+</body>
+</html>
