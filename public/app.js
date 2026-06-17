@@ -15,7 +15,7 @@ function setActive() {
 
 function trackCard(track) {
   return `<a class="card" href="#/tracks/${track.id}">
-    <p class="eyebrow">${esc(track.genre)}</p>
+    <p class="eyebrow">${esc(track.album)}</p>
     <h3>${esc(track.title)}</h3>
     <p class="meta">${esc(track.artist)} · ${esc(track.album)}</p>
     <div class="pills"><span class="pill">${esc(track.durationLabel)}</span>${track.year ? `<span class="pill">${esc(track.year)}</span>` : ''}</div>
@@ -28,13 +28,7 @@ function albumCard(name, tracks) {
 
 function renderHome() {
   const tracks = filteredTracks();
-  if (!tracks.length) { app.innerHTML = `<div class="empty">No recordings are available yet. Please check back soon.</div>`; return; }
-  const albums = tracks.reduce((groups, track) => {
-    groups[track.album] = groups[track.album] || [];
-    groups[track.album].push(track);
-    return groups;
-  }, {});
-  app.innerHTML = `<div class="grid">${Object.entries(albums).sort(([a], [b]) => a.localeCompare(b)).map(([name, albumTracks]) => albumCard(name, albumTracks)).join('')}</div>`;
+  app.innerHTML = tracks.length ? `<div class="grid">${tracks.map(trackCard).join('')}</div>` : `<div class="empty">No recordings are available yet. Please check back soon.</div>`;
 }
 
 function renderAlbums() {
