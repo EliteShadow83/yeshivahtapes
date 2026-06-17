@@ -5,7 +5,7 @@ const { URL } = require('url');
 
 const PORT = process.env.PORT || 3131;
 const RESCAN_INTERVAL_MS = 15 * 60 * 1000;
-const AUDIO_DIR = process.env.AUDIO_DIR || path.join(__dirname, 'audio');
+const AUDIO_DIR = 'D:\\Yeshivahtapes';
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const AUDIO_EXTENSIONS = new Set(['.mp3', '.m4a', '.aac', '.flac', '.wav', '.ogg', '.opus', '.wma']);
 const MIME_TYPES = { '.html':'text/html; charset=utf-8', '.css':'text/css; charset=utf-8', '.js':'text/javascript; charset=utf-8', '.json':'application/json; charset=utf-8', '.mp3':'audio/mpeg', '.m4a':'audio/mp4', '.aac':'audio/aac', '.flac':'audio/flac', '.wav':'audio/wav', '.ogg':'audio/ogg', '.opus':'audio/ogg', '.wma':'audio/x-ms-wma' };
