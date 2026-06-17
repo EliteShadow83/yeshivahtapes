@@ -318,6 +318,28 @@ async function readJsonBody(req) {
   }
 }
 
+async function handleRename(req, res) {
+  const body = await readJsonBody(req);
+  if (!body) return json(res, 400, { error: 'Invalid rename data' });
+  const currentPath = cleanText(body.path);
+  const currentFile = safeJoin(AUDIO_DIR, currentPath);
+  if (!currentFile || !fs.existsSync(currentFile) || fs.statSync(currentFile).isDirectory()) return json(res, 404, { error: 'File not found' });
+
+  const currentExt = path.extname(currentFile);
+  const requestedName = cleanFileName(body.name);
+  if (!requestedName) return json(res, 400, { error: 'New file name is required' });
+  const requestedExt = path.extname(requestedName);
+  const finalName = requestedExt ? requestedName : `${requestedName}${currentExt}`;
+  if (!AUDIO_EXTENSIONS.has(path.extname(finalName).toLowerCase())) return json(res, 400, { error: 'Renamed file must keep a supported audio extension' });
+
+  const newFile = safeJoin(AUDIO_DIR, finalName);
+  if (!newFile) return json(res, 400, { error: 'Invalid destination file name' });
+  if (fs.existsSync(newFile)) return json(res, 409, { error: 'A file with that name already exists' });
+  fs.renameSync(currentFile, newFile);
+  scanLibrary();
+  return json(res, 200, { renamed: { from: currentPath, to: finalName } });
+}
+
 async function handleCreateCategory(req, res) {
   const body = await readJsonBody(req);
   if (!body) return json(res, 400, { error: 'Invalid category data' });
@@ -365,6 +387,7 @@ http.createServer(async (req, res) => {
   if (url.pathname === '/api/library') return json(res, 200, { scanState, tracks: libraryCache, albums: groupedBy('album'), artists: groupedBy('artist'), ...pageData });
   if (url.pathname.startsWith('/api/tracks/')) return json(res, 200, libraryCache.find((item) => item.id === decodeURIComponent(url.pathname.split('/').pop())) || { error: 'Track not found' });
   if (url.pathname === '/api/upload' && req.method === 'POST') return handleUpload(req, res);
+  if (url.pathname === '/api/files' && req.method === 'PATCH') return handleRename(req, res);
   if (url.pathname === '/api/files' && req.method === 'DELETE') return handleDelete(req, res, url);
   if (url.pathname === '/api/pages' && req.method === 'GET') return json(res, 200, pageData);
   if (url.pathname === '/api/pages' && req.method === 'POST') return handleCreatePage(req, res);

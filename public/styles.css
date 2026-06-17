@@ -46,3 +46,4 @@ audio { width:100%; margin-top:16px; }
 .manage-page { padding:36px; min-height:100vh; }
 .manage-button { display:inline-block; width:100%; margin-top:14px; text-align:center; }
 .inline-form { margin-top:16px; }
+.rename-form { margin-top:14px; }

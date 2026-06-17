@@ -39,6 +39,11 @@ async function loadFiles() {
     <p class="eyebrow">${esc(track.album)}</p>
     <h3>${esc(track.title)}</h3>
     <p class="meta">${esc(track.artist)} · ${esc(track.fileName)}</p>
+    <form class="rename-form" data-path="${esc(track.relPath)}">
+      <label for="rename-${esc(track.id)}">Rename audio file</label>
+      <input id="rename-${esc(track.id)}" name="newName" type="text" value="${esc(track.fileName)}">
+      <button class="ghost manage-button" type="submit">Rename file</button>
+    </form>
     <button class="ghost manage-button" data-path="${esc(track.relPath)}">Delete file</button>
   </article>`).join('') : '<div class="empty">No recordings are available to manage.</div>';
 }
@@ -113,6 +118,18 @@ categoryList.addEventListener('click', async (event) => {
   const result = await response.json();
   setMessage(response.ok ? `Subcategory deleted: ${name}.` : `Delete failed: ${result.error}`, response.ok ? 'success' : 'error');
   loadPages();
+});
+
+fileList.addEventListener('submit', async (event) => {
+  const form = event.target.closest('form.rename-form');
+  if (!form) return;
+  event.preventDefault();
+  const newName = new FormData(form).get('newName').trim();
+  if (!newName) { setMessage('Enter a new file name before renaming.', 'warning'); return; }
+  const response = await fetch('/api/files', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: form.dataset.path, name: newName }) });
+  const result = await response.json();
+  setMessage(response.ok ? `Renamed recording: ${result.renamed.from} → ${result.renamed.to}` : `Rename failed: ${result.error}`, response.ok ? 'success' : 'error');
+  loadFiles();
 });
 
 fileList.addEventListener('click', async (event) => {
