@@ -1,0 +1,10 @@
+{
+  "name": "yeshivahtapes-audio-library",
+  "version": "1.0.0",
+  "description": "A sleek audio library website for Windows folders.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "check": "node --check server.js && node --check public/app.js"
+  }
+}
